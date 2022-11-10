@@ -54,6 +54,11 @@ def execute(context):
 
     df_households = pd.merge(df_households, df_homes)
 
+    # Add household size
+    df_households_size = context.stage("synthesis.population.sampled").groupby(["household_id"], as_index=False)["person_id"].count()
+    df_households_size.rename(columns={"person_id": "size"}, inplace=True)
+    df_households = pd.merge(df_households, df_households_size)
+
     # Perform sampling per commune
     with context.parallel(dict(households = df_households, income = df_income)) as parallel:
         commune_ids = df_households["commune_id"].unique()
