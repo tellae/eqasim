@@ -11,9 +11,11 @@ Loads and prepares income distributions by municipality for size of households (
 - For those which are missing: Attach the distribution of the municiality with the nearest centroid
 """
 
+
 def configure(context):
     context.config("data_path")
     context.stage("data.spatial.municipalities")
+
 
 def execute(context):
     FILOSOFI_ATTRIBUTES = [
@@ -25,8 +27,8 @@ def execute(context):
                 {"name": "40_49", "sheet": "TRAGERF_3", "col_pattern": "AGE3"},
                 {"name": "50_59", "sheet": "TRAGERF_4", "col_pattern": "AGE4"},
                 {"name": "60_74", "sheet": "TRAGERF_5", "col_pattern": "AGE5"},
-                {"name": "75_or_more", "sheet": "TRAGERF_6", "col_pattern": "AGE6"}
-            ]
+                {"name": "75_or_more", "sheet": "TRAGERF_6", "col_pattern": "AGE6"},
+            ],
         },
         {
             "name": "household_size",
@@ -35,15 +37,15 @@ def execute(context):
                 {"name": "2_pers", "sheet": "TAILLEM_2", "col_pattern": "TME2"},
                 {"name": "3_pers", "sheet": "TAILLEM_3", "col_pattern": "TME3"},
                 {"name": "4_pers", "sheet": "TAILLEM_4", "col_pattern": "TME4"},
-                {"name": "5_pers_or_more", "sheet": "TAILLEM_5", "col_pattern": "TME5"}
-            ]
+                {"name": "5_pers_or_more", "sheet": "TAILLEM_5", "col_pattern": "TME5"},
+            ],
         },
         {
             "name": "housing_tenure",
             "modalities": [
                 {"name": "Owner", "sheet": "OCCTYPR_1", "col_pattern": "TOL1"},
-                {"name": "Tenant", "sheet": "OCCTYPR_2", "col_pattern": "TOL2"}
-            ]
+                {"name": "Tenant", "sheet": "OCCTYPR_2", "col_pattern": "TOL2"},
+            ],
         },
         {
             "name": "household_type",
@@ -53,8 +55,8 @@ def execute(context):
                 {"name": "Couple_without_child", "sheet": "TYPMENR_3", "col_pattern": "TYM3"},
                 {"name": "Couple_with_child", "sheet": "TYPMENR_4", "col_pattern": "TYM4"},
                 {"name": "Single_parent", "sheet": "TYPMENR_5", "col_pattern": "TYM5"},
-                {"name": "complex_hh", "sheet": "TYPMENR_6", "col_pattern": "TYM6"}
-            ]
+                {"name": "complex_hh", "sheet": "TYPMENR_6", "col_pattern": "TYM6"},
+            ],
         },
         {
             "name": "income_source",
@@ -64,9 +66,9 @@ def execute(context):
                 {"name": "Independent", "sheet": "OPRDEC_3", "col_pattern": "OPR3"},
                 {"name": "Pension", "sheet": "OPRDEC_4", "col_pattern": "OPR4"},
                 {"name": "Property", "sheet": "OPRDEC_5", "col_pattern": "OPR5"},
-                {"name": "None", "sheet": "OPRDEC_6", "col_pattern": "OPR6"}
-            ]
-        }
+                {"name": "None", "sheet": "OPRDEC_6", "col_pattern": "OPR6"},
+            ],
+        },
     ]
 
     # build full list of sheets
@@ -77,7 +79,8 @@ def execute(context):
     # read all needed sheets
     excel_df = pd.read_excel(
         "%s/filosofi_2015/FILO_DISP_COM.xls" % context.config("data_path"),
-        sheet_name = sheet_list, skiprows = 5
+        sheet_name=sheet_list,
+        skiprows=5,
     )
 
     df = pd.DataFrame()
@@ -87,7 +90,13 @@ def execute(context):
             col_pattern = modality["col_pattern"]
 
             # Load income distribution
-            data = excel_df[sheet][["CODGEO"] +["%sD%d15" % (col_pattern, q) if q != 5 else col_pattern + "Q215" for q in range(1, 10)]]
+            data = excel_df[sheet][
+                ["CODGEO"]
+                + [
+                    "%sD%d15" % (col_pattern, q) if q != 5 else col_pattern + "Q215"
+                    for q in range(1, 10)
+                ]
+            ]
             data.columns = ["commune_id", "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9"]
             data["reference_median"] = data["q5"].values
             data["modality"] = modality["name"]
@@ -98,7 +107,24 @@ def execute(context):
     assert len(FILOSOFI_ATTRIBUTES) == len(df["attribute"].unique())
     assert len(sheet_list) == len(df["modality"].unique())
 
-    return df[["commune_id", "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "reference_median", "attribute", "modality"]]
+    return df[
+        [
+            "commune_id",
+            "q1",
+            "q2",
+            "q3",
+            "q4",
+            "q5",
+            "q6",
+            "q7",
+            "q8",
+            "q9",
+            "reference_median",
+            "attribute",
+            "modality",
+        ]
+    ]
+
 
 def validate(context):
     if not os.path.exists("%s/filosofi_2015/FILO_DISP_COM.xls" % context.config("data_path")):
