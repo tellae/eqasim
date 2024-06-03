@@ -55,6 +55,9 @@ def sample_locations(context, arguments):
     # Construct a data set for all commutes to this zone
     origin_id = np.repeat(df_flow["origin_id"].values, df_flow["count"].values)
 
+    np.random.shuffle(origin_id)
+    np.random.shuffle(location_ids)
+
     df_result = pd.DataFrame.from_records(dict(
         origin_id = origin_id,
         location_id = location_ids
