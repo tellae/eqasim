@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.3.0](https://github.com/tellae/eqasim/compare/v1.2.0...v1.3.0) (2025-05-07)
+
+
+### Features
+
+* add comments for bpe enriched ([f121451](https://github.com/tellae/eqasim/commit/f121451d842d1f39bb78ee9b8c04d4440c88784a))
+* add config for Rennes ([d916c50](https://github.com/tellae/eqasim/commit/d916c5097aea90fc371d833f0778249bc2f61f55))
+* add documentation for Rennes ([6440c20](https://github.com/tellae/eqasim/commit/6440c20172f70f73b20fe2ca7903d00de50978e5))
+* artificially add trips to reach 4 millions ([f0ddd39](https://github.com/tellae/eqasim/commit/f0ddd39ff7a894f91f673f188f841852fa0e7ca5))
+* bpe enriched with open data from RM ([dad7d4a](https://github.com/tellae/eqasim/commit/dad7d4aee511f762c74f012dcbd5a489387c9b3a))
+* comment code to save files ([db6a963](https://github.com/tellae/eqasim/commit/db6a96358f42b3dbbf71e0ac4b9273d72d2fd4e8))
+* scripts to use emc² ([895981a](https://github.com/tellae/eqasim/commit/895981a36a4ed767b451806b71d67196479f6585))
+
+
+### Bug Fixes
+
+* Arbitrary order of week days in merged GTFS ([#131](https://github.com/tellae/eqasim/issues/131)) ([f963e3b](https://github.com/tellae/eqasim/commit/f963e3b2eeb06fbabf15ff872610c9df0d3b5535))
+* Behaviour of shutil.which ([#128](https://github.com/tellae/eqasim/issues/128)) ([2879603](https://github.com/tellae/eqasim/commit/2879603d10dc8e5b178b86e89fe7ce42dfd37d01))
+* Properly treat non-movers in EDGT 44 ([#133](https://github.com/tellae/eqasim/issues/133)) ([09ed87a](https://github.com/tellae/eqasim/commit/09ed87ae47703d519fc90ef7080f775358412a73))
+* Remaining bug when loading BPE 2019 ([#132](https://github.com/tellae/eqasim/issues/132)) ([3457a46](https://github.com/tellae/eqasim/commit/3457a468443e0cfb0d848ad6bb07f366570081ed))
+* Update Levenshtein dependency ([#134](https://github.com/tellae/eqasim/issues/134)) ([1aecebb](https://github.com/tellae/eqasim/commit/1aecebb25f1d0dcfd4e332f7f5c8578eb146ff97))
+* Update to BPE 2021 ([#130](https://github.com/tellae/eqasim/issues/130)) ([1d797a6](https://github.com/tellae/eqasim/commit/1d797a67ae1743d1b82c6f2620c3da5a4f08a145))
+
+## Changelog
+
 **Under development**
 
 - Fix: Arbitrary order of week days in merged GTFS
