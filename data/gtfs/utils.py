@@ -4,6 +4,7 @@ import geopandas as gpd
 import shapely.geometry as geo
 import os
 import numpy as np
+import datetime
 
 REQUIRED_SLOTS = [
     "agency", "stops", "routes", "trips", "stop_times"
@@ -83,6 +84,7 @@ def read_feed(path):
         if not "parent_station" in df_stops:
             print("WARNING Missing parent_station in stops, setting to empty string")
             df_stops["parent_station"] = ""
+        df_stops.loc[df_stops["parent_station"].isna() & (df_stops["location_type"] == 0), "location_type"] = 1
 
     if "transfers" in feed:
         df_transfers = feed["transfers"]
@@ -100,6 +102,8 @@ def read_feed(path):
 
     if "agency" in feed:
         df_agency = feed["agency"]
+        if "agency_id" not in df_agency.columns:
+            df_agency["agency_id"] = "generic"
         df_agency.loc[df_agency["agency_id"].isna(), "agency_id"] = "generic"
 
     if "routes" in feed:
@@ -310,7 +314,7 @@ def merge_two_feeds(first, second, suffix = "_merged"):
                     )
 
                     for ref_slot, ref_identifier in collision["references"]:
-                        if ref_slot in first and ref_slot in second:
+                        if ref_slot in second:
                             second[ref_slot][ref_identifier] = second[ref_slot][ref_identifier].replace(
                                 duplicate_ids, replacement_ids
                             )
@@ -322,5 +326,305 @@ def merge_two_feeds(first, second, suffix = "_merged"):
             feed[slot] = first[slot].copy()
         elif slot in second:
             feed[slot] = second[slot].copy()
+
+    return feed
+
+def gtfs_to_seconds(time_str):
+    """Convertit du format HH:MM:SS en secondes"""
+    h, m, s = map(int, time_str.split(":"))
+    return h * 3600 + m * 60 + s
+
+def secondes_to_gtfs(secondes):
+    """Convertit des sedonces au format HH:MM:SS"""
+    h = secondes // 3600
+    m = (secondes % 3600) // 60
+    s = (secondes % 60)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d}"
+
+
+def get_active_services(feed, target_date):
+    """Renvoie l'ensemble des service_id actifs pour la date target_date."""
+
+    target_dt = datetime.datetime.strptime(target_date, "%Y%m%d")
+    weekday = target_dt.strftime("%A").lower()
+
+    active = set()
+
+    if "calendar" in feed:
+        cal = feed["calendar"]
+
+        for _, r in cal.iterrows():
+            if (
+                r["start_date"] <= int(target_date) <= r["end_date"]
+                and r[weekday] == 1
+            ):
+                active.add(str(r["service_id"]))
+
+    if "calendar_dates" in feed:
+        cald = feed["calendar_dates"]
+
+        for _, r in cald.iterrows():
+            if int(r["date"]) == int(target_date):
+
+                if r["exception_type"] == 1:
+                    active.add(str(r["service_id"]))
+
+                elif r["exception_type"] == 2:
+                    active.discard(str(r["service_id"]))
+
+    return active
+
+def filtre_periode(trip_infos, START_TIME, END_TIME):
+    """Filtre les missions dont l'heure de départ est dans la période considérée"""
+    start_sec = gtfs_to_seconds(START_TIME)
+    end_sec = gtfs_to_seconds(END_TIME)
+
+    return trip_infos[(trip_infos["departure_sec"] >= start_sec) & (trip_infos["departure_sec"] <= end_sec)]
+
+def filtre_missions(trips, stop_times, START_TIME, END_TIME):
+    """Permet de filtrer toutes les missions éligibles et qu'il faudra ensuite simplifier"""
+    grouped = stop_times.groupby("trip_id")
+
+    signatures = grouped["stop_id"].agg(tuple) # Creation de la liste des arrêts sous forme de tupple
+
+    # Heure de départ au premier arrêt
+    first_departures = grouped["departure_sec"].first()
+
+    # Heure d'arrivée au dernier arrêt
+    last_arrivals = grouped["arrival_sec"].last()
+
+    trip_infos = pd.DataFrame({
+        "trip_id": signatures.index,
+        "signature": signatures.values,
+        "departure_sec": first_departures.values,
+        "duration_sec": (last_arrivals - first_departures).values,
+    })
+
+    #Ajout de l'information de la route_id et de la direction
+    trip_infos = trip_infos.merge(trips[["trip_id", "route_id", "direction_id"]],on="trip_id",how="left") 
+
+    # Filtre sur la période traitée
+    trip_infos = filtre_periode(trip_infos, START_TIME, END_TIME)
+
+    # Debug sur certains trip_id
+    debug_trips = {
+        "OCESN886700F1187_F:TER:FR:Line::6349C213-7B19-4078-BF2B-43CBECDA9545::87743716:87726000:13:710:20260831",
+        "OCESN886734F1187_F:TER:FR:Line::6349C213-7B19-4078-BF2B-43CBECDA9545::87743716:87726000:13:1740:20260831",
+        "OCESN886760F1187_F:TER:FR:Line::6349C213-7B19-4078-BF2B-43CBECDA9545::87743716:87726000:13:1240:20260831",
+    }
+
+    print("\n=== DEBUG TRIP_INFOS ===")
+    print(
+        trip_infos.loc[
+            trip_infos["trip_id"].isin(debug_trips)
+        ].to_string()
+    ) 
+
+    return trip_infos
+
+def elect_reference_trip(missions):
+    """Retourne le trip_id de la mission élue comme représentative"""
+    durations = missions["duration_sec"] #ensemble des durées des missions
+
+    median_duration = durations.median() # calcul de la médiane
+
+    reference_trip = missions.iloc[(durations - median_duration).abs().argmin()]
+
+    return reference_trip["trip_id"]   
+
+def build_time_pattern(reference_trip_id, stop_times, trip_indices):
+    """Stocke pour la mission de référence, les temps de parcours inter-arrêts"""
+    idx = trip_indices[reference_trip_id]
+
+    reference = stop_times.loc[idx].sort_values("stop_sequence")
+
+    offset = reference.iloc[0]["departure_sec"] # Heure de départ de la mission sert d'offset
+
+    # reference_stop_times["arrival_offset"] = reference_stop_times["arrival_time"].apply(gtfs_to_seconds) - offset
+    # reference_stop_times["departure_offset"] = reference_stop_times["departure_time"].apply(gtfs_to_seconds) - offset
+
+    return {
+        "arrival_offset": (reference["arrival_sec"] - offset).to_numpy(),
+        "departure_offset": (reference["departure_sec"] - offset).to_numpy()
+    }
+
+def apply_pattern_inplace(stop_times, trip_indices, reference_offsets, trip_id):
+    """Met à jour directement les stop_times d'une mission sans recréer de DataFrame."""
+
+    idx = trip_indices[trip_id]
+
+    departure_time = stop_times.loc[idx, "departure_sec"].iloc[0]
+
+    if len(idx) != len(reference_offsets["arrival_offset"]):
+        raise ValueError(f"Trip {trip_id} incompatible avec le pattern")
+
+    # Sauvegarde des anciennes valeurs
+    old_arrivals = stop_times.loc[idx, "arrival_sec"].to_numpy().copy()
+    old_departures = stop_times.loc[idx, "departure_sec"].to_numpy().copy()
+
+    # Calcul des nouvelles valeurs
+    new_arrivals = (
+        departure_time + reference_offsets["arrival_offset"]
+    )
+
+    new_departures = (
+        departure_time + reference_offsets["departure_offset"]
+    )
+
+    # Application
+    stop_times.loc[idx, "arrival_sec"] = new_arrivals
+    stop_times.loc[idx, "departure_sec"] = new_departures
+
+    # Log détaillé uniquement pour certains trips
+    debug_trips = {
+        "OCESN886700F1187_F:TER:FR:Line::6349C213-7B19-4078-BF2B-43CBECDA9545::87743716:87726000:13:710:20260831",
+        "OCESN886734F1187_F:TER:FR:Line::6349C213-7B19-4078-BF2B-43CBECDA9545::87743716:87726000:13:1740:20260831",
+        "OCESN886760F1187_F:TER:FR:Line::6349C213-7B19-4078-BF2B-43CBECDA9545::87743716:87726000:13:1240:20260831",
+    }
+
+    if trip_id in debug_trips:
+        print(f"\n=== Trip modifié : {trip_id} ===")
+
+        for i, (old_a, new_a, old_d, new_d) in enumerate(
+            zip(old_arrivals, new_arrivals, old_departures, new_departures),
+            start=1
+        ):
+            print(
+                f"Arrêt {i} | "
+                f"Arrival : {secondes_to_gtfs(old_a)} -> {secondes_to_gtfs(new_a)} | "
+                f"Departure : {secondes_to_gtfs(old_d)} -> {secondes_to_gtfs(new_d)}"
+            )
+
+def simplify_feed(feed, target_date, start_time="00:00:00", end_time="24:00:00"):
+    # Lecture des fichiers
+    trips = feed["trips"].copy()
+    stop_times = feed["stop_times"].copy()
+    stops = feed["stops"].copy()
+
+    # Uniformisation des types pour éviter les problèmes de comparaison
+    trips["service_id"] = trips["service_id"].astype(str)
+
+    # Filtrage sur la date du GTFS souhaitée
+    active = get_active_services(feed, target_date)
+
+    print("SERVICES ACTIFS =====>", active)
+
+    active_trips = trips[
+        trips["service_id"].isin(active)
+    ].copy()
+
+    print(
+        active_trips[["trip_id", "service_id"]].to_string()
+    )
+
+    # IMPORTANT :
+    # on ne garde que les stop_times des trips actifs
+    active_stop_times = stop_times[
+        stop_times["trip_id"].isin(active_trips["trip_id"])
+    ].copy()
+
+    # Tri des stop_times par trip_id et stop_sequence
+    active_stop_times = active_stop_times.sort_values(
+        ["trip_id", "stop_sequence"]
+    )
+
+    # Création des colonnes pour avoir le temps en secondes
+    active_stop_times["departure_sec"] = (
+        active_stop_times["departure_time"].map(gtfs_to_seconds)
+    )
+
+    active_stop_times["arrival_sec"] = (
+        active_stop_times["arrival_time"].map(gtfs_to_seconds)
+    )
+
+    # Récupération des missions éligibles
+    missions_eligibles = filtre_missions(
+        active_trips,
+        active_stop_times,
+        start_time,
+        end_time
+    )
+
+    print(
+        f"Nombre de groupes de missions : "
+        f"{missions_eligibles.groupby(['route_id', 'direction_id', 'signature']).ngroups}"
+    )
+
+    # Stockage des numéros de lignes que l'on va modifier
+    trip_indices = active_stop_times.groupby("trip_id").groups
+
+    # Boucle par couple (route_id, direction_id, signature)
+    for cle, missions in missions_eligibles.groupby(
+        ["route_id", "direction_id", "signature"]
+    ):
+
+        if len(missions) < 2:
+            continue
+
+        # Élection de la mission représentative
+        reference_trip_id = elect_reference_trip(missions)
+
+        # Récupération du pattern (temps de parcours)
+        pattern = build_time_pattern(
+            reference_trip_id,
+            active_stop_times,
+            trip_indices,
+        )
+
+        print(
+            f"Mise à jour des temps de {len(missions)} missions. "
+            f"La mission référence est {reference_trip_id}"
+        )
+
+        for trip_id in missions["trip_id"]:
+
+            if trip_id == reference_trip_id:
+                continue
+
+            apply_pattern_inplace(
+                active_stop_times,
+                trip_indices,
+                pattern,
+                trip_id,
+            )
+
+    # Conversion des secondes vers le format GTFS
+    active_stop_times["arrival_time"] = (
+        active_stop_times["arrival_sec"].map(secondes_to_gtfs)
+    )
+
+    active_stop_times["departure_time"] = (
+        active_stop_times["departure_sec"].map(secondes_to_gtfs)
+    )
+
+    active_stop_times = active_stop_times.drop(
+        columns=["arrival_sec", "departure_sec"]
+    )
+
+    # Remplacement des stop_times actifs par leur version simplifiée
+    active_trip_ids = set(active_trips["trip_id"])
+
+    stop_times = stop_times[
+        ~stop_times["trip_id"].isin(active_trip_ids)
+    ]
+
+    stop_times = pd.concat(
+        [stop_times, active_stop_times],
+        ignore_index=True
+    )
+
+    # Filtre des stops non utilisés
+    # used_stops = set(stop_times["stop_id"])
+    # print(
+    #     f"Seulement {len(used_stops)} utilisés sur {len(stops)} : "
+    #     f"suppression de {len(stops) - len(used_stops)} stops"
+    # )
+    # stops = stops[stops["stop_id"].isin(used_stops)].copy()
+
+    feed["trips"] = trips
+    feed["stop_times"] = stop_times
+    feed["stops"] = stops
+
+    print("INFO : Simplification des GTFS terminée")
 
     return feed
