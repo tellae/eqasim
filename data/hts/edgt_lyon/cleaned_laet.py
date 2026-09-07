@@ -190,6 +190,23 @@ def execute(context):
     # Socioprofessional class
     df_persons["socioprofessional_class"] = df_persons["P11"].str[0].fillna(8).astype(int)
 
+    # remove trips and persons without home as first activity
+    first_activity = df_trips.sort_values(["household_id", "person_id", "trip_id"]).groupby(["household_id", "person_id"], as_index=False)["preceding_purpose"].first()
+    first_activity = first_activity.rename(columns={"preceding_purpose": "first_activity"})
+    persons_to_keep = first_activity.query("first_activity=='home'")
+    print(f"/!\ {len(first_activity) - len(persons_to_keep)} ({round(100*(1-len(persons_to_keep)/len(first_activity)),1)}%) persons will be removed because their first activity is not home.")
+
+    print("# persons before removal:", len(df_persons))
+    print("# trips before removal:", len(df_trips))
+
+    df_persons=df_persons.merge(first_activity, how="left", on=["household_id", "person_id"])
+    df_persons=df_persons[(df_persons["first_activity"]=="home") | (df_persons["first_activity"].isna())].drop(columns=["first_activity"])
+
+    df_trips=df_trips.merge(first_activity, how="left", on=["household_id", "person_id"])
+    df_trips=df_trips.query("first_activity=='home'").drop(columns=["first_activity"])
+    print("# persons after removal:", len(df_persons))
+    print("# trips after removal:", len(df_trips))
+
     assert df_persons["socioprofessional_class"].max() <= 9
     # Check departure and arrival times
     assert np.count_nonzero(df_trips["departure_time"].isna()) == 0
