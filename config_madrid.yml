@@ -1,0 +1,59 @@
+## Synthetic population pipeline for Nantes
+## based on the synpp package
+
+# This is the path to a directory where the pipeline can store temporary data
+working_directory: cache
+
+# This section defines which parts of the pipeline should be run
+run:
+  - synthesis.output # To create the output population in the output_path (see below)
+  # - matsim.output # Uncomment, if you want to run the full simulation (you'll need Java for that)
+  - analysis.synthesis.population
+  
+# Here the configuraiton of the pipeline starts
+config:
+  # Some general configuration
+  processes: 4
+
+  # Define whether to use ENTD or EGT as the household travel survey (HTS)
+  hts: edm_spain
+
+  # Define sampling rate and random seed for the output population
+  sampling_rate: 0.1
+  random_seed: 1234
+
+  # Paths to the input data and where the output should be stored
+  data_path: /home/marie/tellae/data/spain
+  output_path: output
+  output_prefix: madrid_
+  output_formats: [ "parquet", "geoparquet"]
+
+  # Only interesting if you run the simulation
+  java_memory: 14G
+
+  # Activate if you want to run mode choice
+  mode_choice: false
+  home_location_source: tiles
+  crs: "EPSG:3035"
+  matching_attributes: ["sex", "any_cars", "age_class", "socioprofessional_class"]
+  
+  census_path: censo_2021/censo2021_spain.parquet
+  bpe_path: bpe/BPE_spain26.parquet
+  tiles_path: tiles_2021/tiles_100m_spain.zip
+  tiles_file: tiles_100m_spain.gpkg
+  od_pro_path: od/ODPRO_madrid_tues.parquet
+  od_sco_path: od/ODSCO_madrid_tues.parquet
+  population_path: censo_2021/pop_muni_2021_csv.zip
+  population_csv: pop_muni_2021.csv
+  population_year: 21
+  codes_path: iris_2024/ref_zoning_spain_madrid.zip
+  codes_xlsx: ref_zoning_spain_madrid.xlsx
+  # Nantes settings
+  regions: []
+  departments: [28]
+
+# Overrides for the spain pipeline compared to the Île-de-France pipeline
+aliases:
+  synthesis.population.income.selected: spain.income
+  data.sirene.localized: spain.empresas.localized
+  

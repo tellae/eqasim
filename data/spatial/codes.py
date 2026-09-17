@@ -22,7 +22,7 @@ def execute(context):
         "{}/{}".format(context.config("data_path"), context.config("codes_path"))) as archive:
         with archive.open(context.config("codes_xlsx")) as f:
             df_codes = pd.read_excel(f,
-                skiprows = 5, sheet_name = "Emboitements_IRIS",dtype={"CODE_IRIS":str,"DEPCOM":str}
+                skiprows = 5, sheet_name = "Emboitements_IRIS",dtype={"CODE_IRIS":str,"DEPCOM":str,"DEP":str}
             )[["CODE_IRIS", "DEPCOM", "DEP", "REG"]].rename(columns = {
                 "CODE_IRIS": "iris_id",
                 "DEPCOM": "commune_id",
