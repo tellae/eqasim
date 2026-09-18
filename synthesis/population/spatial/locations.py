@@ -22,9 +22,8 @@ def execute(context):
     # Home locations
     df_home_locations = df_locations[df_locations["purpose"] == "home"]
     df_home_locations = pd.merge(df_home_locations, df_persons, on = "person_id")
-    df_home_locations = pd.merge(df_home_locations, df_home[["household_id", "geometry"]], on = "household_id")
+    df_home_locations = pd.merge(df_home_locations, df_home[["household_id", "location_id", "geometry"]], on = "household_id")
     df_home_locations["type_act"] = "house"
-    df_home_locations["location_id"] = -1
     df_home_locations = df_home_locations[["person_id", "activity_index","type_act", "location_id", "geometry"]]
 
     # Work locations
