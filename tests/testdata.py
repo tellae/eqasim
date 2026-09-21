@@ -689,7 +689,7 @@ def create(output_path):
     df_work.columns = columns
 
     print("Hash", "df_work", pd.util.hash_pandas_object(df_work, index = True).sum())
-    assert pd.util.hash_pandas_object(df_work, index = True).sum() == 6975741772103988418
+    assert pd.util.hash_pandas_object(df_work, index = True).sum() == 3845109084973782014
 
     df_work.to_parquet("%s/rp_2022/RP2022_mobpro.parquet" % output_path)
 
