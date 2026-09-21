@@ -678,7 +678,8 @@ def create(output_path):
     df_work = pd.DataFrame(dict(
         COMMUNE = municipalities[random.integers(0, len(municipalities), observations)],
         DCLT = municipalities[random.integers(0, len(municipalities), observations)],
-        TRANS = random.integers(1, 6, size = (observations,))
+        TRANS = random.integers(1, 6, size = (observations,)),
+        GS=random.choice(["1", "2", "3", "4", "5", "6", "Z"]),
     ))
 
     df_work["ARM"] = "Z"
