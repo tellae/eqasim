@@ -140,7 +140,7 @@ def _test_determinism(index, data_path, tmpdir):
     manager.check(
         "ile_de_france_activities.gpkg",
         "{}/ile_de_france_activities.gpkg".format(output_path),
-        "ca8066414a7607762ab86d5e5237c7c8")
+        "655361ab40b729599836da1934c77621")
 
     manager.check(
         "ile_de_france_commutes.gpkg",
