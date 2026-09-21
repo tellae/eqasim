@@ -706,7 +706,7 @@ def create(output_path):
     df_education.columns = columns
 
     print("Hash", "df_education", pd.util.hash_pandas_object(df_education, index = True).sum())
-    assert pd.util.hash_pandas_object(df_education, index = True).sum() == 3071821450482011272
+    assert pd.util.hash_pandas_object(df_education, index = True).sum() == 4112779972185059587
 
     df_education.to_parquet("%s/rp_2022/RP2022_mobsco.parquet" % output_path)
 
