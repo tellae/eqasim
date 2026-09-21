@@ -684,7 +684,7 @@ def create(output_path):
     df_work["ARM"] = "Z"
     df_work["IPONDI"] = 1.0
 
-    columns = ["COMMUNE", "DCLT", "TRANS", "ARM", "IPONDI"]
+    columns = ["COMMUNE", "DCLT", "TRANS", "ARM", "IPONDI","GS"]
     df_work.columns = columns
 
     print("Hash", "df_work", pd.util.hash_pandas_object(df_work, index = True).sum())
