@@ -24,6 +24,9 @@ def fix_origins(df, commune_ids, purpose,category):
     missing = np.array(list(set(product(
         commune_ids, df[category].cat.categories.values)) - existing))
 
+    if len(missing) == 0:
+        return df
+
     # for each missing origin x category we create a flow to itself
     df_missing = pd.DataFrame({
         "origin_id": pd.Categorical(missing[:, 0], dtype = df["origin_id"].dtype),
@@ -58,7 +61,8 @@ def execute(context):
     
     if context.config("education_location_source") == 'bpe':
         # Aggregate education (we do not consider different age range with bpe source)
-        df_education = df_education[["origin_id", "destination_id", "weight","total"]].groupby(["origin_id", "destination_id"]).sum().reset_index()    
+        df_education = df_education[["origin_id", "destination_id", "weight","total"]].groupby(["origin_id", "destination_id"]).sum()
+        df_education = df_education[df_education["total"]!=0].reset_index() 
     # Compute weight
     df_work["weight"] /= df_work["total"]
     df_education["weight"] /= df_education["total"]
